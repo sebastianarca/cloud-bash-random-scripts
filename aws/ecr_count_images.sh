@@ -15,19 +15,29 @@ fi
 
 echo -e "\n\n Counting images in each repository..."
 for repository in $repositories; do
-    echo "Checking repository: $repository"
+    echo "Counting images in repository: $repository"
     images_count=$(aws --profile $AWS_PROFILE ecr describe-images --repository-name $repository  --query 'length(imageDetails[*])' --output text)
     ecr_count_images[$repository]=$images_count
 done
 
 echo -e "\n\n Getting latest image pushed date in each repository..."
 for repository in $repositories; do
-    echo "Checking repository: $repository"
-    latest_pushed_image=$(aws --profile $AWS_PROFILE ecr describe-images --repository-name $repository  --query 'sort_by(imageDetails,&imagePushedAt)[-1].imagePushedAt' --output text)
-    ecr_date_latest_image_pushed[$repository]=$(date -d "$latest_pushed_image" +"%Y-%m-%d %H:%M:%S")
-    if [ $? -ne 0 ]; then
-        echo "Error formatting date."
-        ecr_date_latest_image_pushed[$repository]=$latest_pushed_image
+    echo "Getting latest image pushed date in repository: $repository"
+    # Get timestamp and clean microseconds + adjust timezone
+    latest_pushed_image=$(aws --profile $AWS_PROFILE ecr describe-images --repository-name $repository \
+        --query 'sort_by(imageDetails,&imagePushedAt)[-1].imagePushedAt' --output text | \
+        sed 's/\(\.[0-9]\{6\}\)\([-+][0-9]\{2\}\):\([0-9]\{2\}\)/\1\2\3/')
+    
+    ecr_date_latest_image_pushed["$repository"]="N/A"
+    
+    if [ -n "$latest_pushed_image" ]; then
+        formatted_date=$(date -d "$latest_pushed_image" +"%Y-%m-%d %H:%M:%S" 2>/dev/null)
+        if [ $? -eq 0 ]; then
+            ecr_date_latest_image_pushed["$repository"]=$formatted_date
+        else
+            echo "Fail: Invalid date format for $repository. Using raw value."
+            ecr_date_latest_image_pushed["$repository"]=$latest_pushed_image
+        fi
     fi
 done
 
