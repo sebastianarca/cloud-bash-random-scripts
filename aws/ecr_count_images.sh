@@ -1,7 +1,7 @@
 #!/bin/bash
 # This script list all ECR respostories with aws cli, and count the number of images in each repository. Then get the latest image upload date for each repository. The output is a file csv with format: repository_name, number_of_images, latest_image_upload_date.
 
-export AWS_PROFILE=qa
+export AWS_PROFILE=prod
 
 declare -A ecr_count_images=()
 declare -A ecr_date_latest_image_pushed=()
@@ -25,6 +25,10 @@ for repository in $repositories; do
     echo "Checking repository: $repository"
     latest_pushed_image=$(aws --profile $AWS_PROFILE ecr describe-images --repository-name $repository  --query 'sort_by(imageDetails,&imagePushedAt)[-1].imagePushedAt' --output text)
     ecr_date_latest_image_pushed[$repository]=$(date -d "$latest_pushed_image" +"%Y-%m-%d %H:%M:%S")
+    if [ $? -ne 0 ]; then
+        echo "Error formatting date."
+        ecr_date_latest_image_pushed[$repository]=$latest_pushed_image
+    fi
 done
 
 echo -e "\n\n Generate output as CSV format..."
